@@ -47,14 +47,12 @@ name/value pairs, which include:
 The code reference that is invoked for each try.
 
 The code is invoked with the code reference I<$done> as the argument.
-The code is expected to invoke I<$done> directly or indirectly,
-synchronously or asynchronouslym with the following arguments: The
-first argument must be the boolean value representing whether the
-retry has succeeded or not.  The second argment optionally accept any
-value, which can be used to pass application-dependent data from the
-C<on_retry> code to the C<on_end> code.  The I<$done> is expected to
-be invoked exactly once.  Second or later invocations are silently
-ignored.
+The code is expected to invoke I<$done> extactly once, directly or
+indirectly, synchronously or asynchronously, with the following
+arguments: The first argument must be the boolean value representing
+whether the retry has succeeded or not.  The second argment optionally
+accept any value, which can be used to pass application-dependent data
+from the C<on_retry> code to the C<on_end> code.
 
 The code is expected not to throw any exception.  The I<$done> code
 will not throw any exception.
