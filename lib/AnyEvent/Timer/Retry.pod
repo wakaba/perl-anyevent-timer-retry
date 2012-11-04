@@ -1,0 +1,112 @@
+=head1 NAME
+
+AnyEvent::Timer::Retry - Retrying until some condition is satisfied
+
+=head1 SYNOPSIS
+
+  use AnyEvent::Timer::Retry;
+  AnyEvent::Timer::Retry->new
+      (on_retry => sub {
+         warn sprintf "%dth retry..." $_[0]->retry_count;
+         $_[0]->set_result ($ok, $appdata);
+       },
+       on_done => sub {
+         my ($self, $ok, $appdata) = @_;
+         if ($ok) {
+           warn sprintf "Succeeded after %d tries", $self->retry_count;
+         } else {
+           warn sprintf "Failed after %d tries", $self->retry_count;
+         }
+       });
+
+=head1 DESCRIPTION
+
+The C<AnyEvent::Timer::Retry> module repeatedly run a code until some
+condition is satisfied.
+
+=head1 METHODS
+
+The module runs the specified code by instantiating it with the C<new>
+method.  The code specified by the C<on_retry> option to the method is
+repeatedly invoked until the C<set_result> method of the object is
+invoked with a true value, or the execution is cancelled.  Finally the
+code specified by the C<on_done> option is invoked.
+
+=over 4
+
+=item $timer = AnyEvent::Timer::Retry->new (NAME => VALUE, ...)
+
+Run a code with specified arguments.  Arguments must be specified as
+name/value pairs, which include:
+
+=over 4
+
+=item on_retry => CODE
+
+The code reference that is invoked for each try.
+
+The code is invoked with an argument: The C<AnyEvent::Timer::Retry>
+object created by the C<new> method.  The code is expected not to
+throw any exception.
+
+The code is expected to invoke the C<set_result> method of the
+C<AnyEvent::Timer::Retry> object, directly or indirectly,
+synchronously or asynchronously.
+
+Note that this code is also invoked for the first try.  It is counted
+as the "zeroth" retry.
+
+This option must be specified.
+
+=item on_done => CODE
+
+The code reference that is invoked after the result of the last retry
+is determined.
+
+The code is invoked with three arguments: The
+C<AnyEvent::Timer::Retry> object created by the C<new> method; The
+result of the last retry in boolean; The optional application data set
+by the C<set_result> method.  The code is expected not to throw any
+exception.
+
+=item initial_interval => NUMBER
+
+The initial value for the interval between retries, in seconds.
+
+=back
+
+=item $count = $timer->retry_count
+
+The current number of the retries.  For the first run of the
+C<on_retry> code, it returns zero (0).  For the first I<retry>, it
+returns one (1).
+
+After the last retry, this method returns the number of the retries
+run with the object.
+
+=item $timer->set_result ($ok, $data)
+
+Set the result of the retry.  The first argument must be the boolean
+value representing whether the retry has succeeded or not.  The second
+argment optionally accept any value, which can be used to pass
+application-dependent data from the C<on_retry> code to the C<on_done>
+code.
+
+This method must be invoked exactly once by the C<on_retry> code,
+directly or indirectly, synchronously or asynchronously.  The method
+must not invoked in the other situations.
+
+=back
+
+=head1 AUTHOR
+
+Wakaba <wakaba@suikawiki.org>.
+
+=head1 LICENSE
+
+Copyright 2012 Wakaba <wakaba@suikawiki.org>.
+
+This library is free software; you can redistribute it and/or modify
+it under the same terms as Perl itself.
+
+=cut
