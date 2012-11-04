@@ -46,6 +46,97 @@ test {
 
 test {
   my $c = shift;
+  my $start_time = time;
+  my $timer; $timer = AnyEvent::Timer::Retry->new
+      (on_retry => sub {
+         #
+       },
+       on_done => sub {
+         test {
+           my $elapsed = time - $start_time;
+           ok $elapsed < 2 + 1;
+           ok $elapsed > 2 - 1;
+           done $c;
+           undef $c;
+           undef $timer;
+         } $c;
+       },
+       timeout => 2);
+} n => 2, name => 'global timeout';
+
+test {
+  my $c = shift;
+  my $start_time = time;
+  my $cv = AE::cv;
+  $cv->begin;
+  $cv->begin;
+  $cv->begin;
+  my $i = 0;
+  my $timer; $timer = AnyEvent::Timer::Retry->new
+      (on_retry => sub {
+         my $timer = $_[0];
+         my $w; $w = AE::timer 3, 0, sub {
+           $timer->set_result (1);
+           undef $w;
+           $i++;
+           $cv->end;
+         };
+       },
+       on_done => sub {
+         my $ok = $_[1];
+         test {
+           ok !$ok;
+           $cv->end;
+           undef $timer;
+         } $c;
+       },
+       initial_interval => 0.1,
+       timeout => 1);
+  $cv->end;
+  $cv->cb(sub {
+    test {
+      is $i, 1;
+      done $c;
+      undef $c;
+    } $c;
+  });
+} n => 2, name => 'ok after global timeout';
+
+test {
+  my $c = shift;
+  my $cv = AE::cv;
+  my $i = 0;
+  $cv->begin;
+  $cv->begin;
+  my $timer; $timer = AnyEvent::Timer::Retry->new
+      (on_retry => sub { },
+       on_done => sub {
+         test {
+           is $i++, 0;
+           undef $timer;
+           $cv->end;
+         } $c;
+       },
+       timeout => 0);
+  $cv->begin;
+  my $w; $w = AE::timer 100, 0, sub {
+    test {
+      is $i++, 1;
+      $cv->end;
+      undef $w;
+    } $c;
+  };
+  $cv->end;
+  $cv->cb(sub {
+    test {
+      done $c;
+      undef $c;
+    } $c;
+  });
+} n => 2, name => 'no global timeout';
+
+test {
+  my $c = shift;
   
   my $start_time = time;
   my $timer; $timer = AnyEvent::Timer::Retry->new

@@ -7,6 +7,12 @@ use Scalar::Util qw(weaken);
 sub new ($%) {
   my $class = shift;
   my $self = bless {@_, retry_count => 0}, $class;
+  if (my $timeout = $self->timeout) {
+    weaken (my $self = $self);
+    $self->{timer}->{global} = AE::timer $timeout, 0, sub {
+      $self->cancel if $self;
+    };
+  }
   $self->_try (0);
   return $self;
 } # new
@@ -16,7 +22,8 @@ sub _try ($$) {
   my $interval = shift;
   my $n = $self->{retry_count};
   $self->{timer}->{$n} = AE::timer $interval, 0, sub {
-    $self->{on_retry}->($self) if $self;
+    return unless $self;
+    $self->{on_retry}->($self);
     undef $self->{timer}->{$n};
   };
 } # _try
@@ -31,6 +38,7 @@ sub set_result ($$) {
       $self->{on_done}->($self, $result, $value);
       undef $timer;
     };
+    delete $_[0]->{timer};
   } else {
     $self->{retry_count}++;
     $self->_try ($self->get_next_interval);
@@ -50,10 +58,13 @@ sub get_next_interval ($) {
   return $self->initial_interval;
 } # get_next_interval
 
+sub timeout ($) {
+  return $_[0]->{timeout} || 60;
+} # timeout
+
 sub cancel ($) {
   $_[0]->{done} = 1;
   $_[0]->set_result (0);
-  delete $_[0]->{timer};
 } # cancel
 
 sub DESTROY {

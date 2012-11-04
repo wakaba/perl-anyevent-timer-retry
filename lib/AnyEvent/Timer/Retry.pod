@@ -74,6 +74,14 @@ exception.
 
 The initial value for the interval between retries, in seconds.
 
+=item timeout => NUMBER
+
+The global timeout, in seconds.  After this period is elapsed after
+the C<new> method is invoked, the ongoing retrying is marked as failed
+and the entire retrying process is cancelled.  Defaulted to 60.
+
+Timeout is not set if zero or C<undef> is specified.
+
 =back
 
 =item $count = $timer->retry_count
