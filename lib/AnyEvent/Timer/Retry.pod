@@ -226,6 +226,11 @@ algorithm-specific option by C<< $timer->{$type . '_backoff_' . $name}
 member of C<< $timer >> should not be accessed.  The code reference is
 expected not to throw any exception.
 
+=head1 DEVELOPMENT
+
+Latest version of the module is available from GitHub
+<https://github.com/wakaba/perl-anyevent-timer-retry>.
+
 =head1 AUTHOR
 
 Wakaba <wakaba@suikawiki.org>.
