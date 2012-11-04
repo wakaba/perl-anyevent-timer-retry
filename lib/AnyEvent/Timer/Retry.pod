@@ -5,7 +5,7 @@ AnyEvent::Timer::Retry - Retrying until some condition is satisfied
 =head1 SYNOPSIS
 
   use AnyEvent::Timer::Retry;
-  AnyEvent::Timer::Retry->new
+  my $timer; $timer = AnyEvent::Timer::Retry->new
       (on_retry => sub {
          warn sprintf "%dth retry..." $_[0]->retry_count;
          $_[0]->set_result ($ok, $appdata);
@@ -17,6 +17,7 @@ AnyEvent::Timer::Retry - Retrying until some condition is satisfied
          } else {
            warn sprintf "Failed after %d tries", $self->retry_count;
          }
+         undef $timer;
        });
 
 =head1 DESCRIPTION
@@ -95,6 +96,18 @@ code.
 This method must be invoked exactly once by the C<on_retry> code,
 directly or indirectly, synchronously or asynchronously.  The method
 must not invoked in the other situations.
+
+=item undef $timer
+
+=item $timer->cancel
+
+Cancel the retrying, as soon as possible.  Once the C<cancel> method
+is invoked, or all references to the object is discarded, no more
+retry will be initiated later.  Please note that the currently running
+retry cannot be stoped, although it is marked as failure.
+
+After cancelled, the C<on_done> code is invoked with the result
+argument set to false, with no application data.
 
 =back
 
