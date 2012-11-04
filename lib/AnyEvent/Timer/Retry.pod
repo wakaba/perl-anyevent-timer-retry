@@ -84,7 +84,7 @@ The global timeout, in seconds.  After this period has elapsed since
 the C<new> method is invoked, the ongoing retrying is marked as failed
 and the entire retrying process is cancelled.  Defaulted to 60.
 
-Timeout is not set if zero or C<undef> is specified.
+Timeout is not set if the value is a negative number.
 
 =item retry_timeout => NUMBER
 
@@ -94,7 +94,7 @@ the next retrying with the appropriate interval.  Please note that the
 retrying operation itself cannot be stopped, but its result is simply
 discarded.  Defaulted to 60.
 
-Timeout is not set if zero or C<undef> is specified.
+Timeout is not set if the value is a negative number.
 
 =back
 

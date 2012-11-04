@@ -11,7 +11,8 @@ sub new ($%) {
   croak "No |on_retry|" unless $values->{on_retry};
   croak "No |on_end|" unless $values->{on_end};
   my $self = bless $values, $class;
-  if (my $timeout = $self->timeout) {
+  my $timeout = $self->timeout;
+  if (defined $timeout and $timeout >= 0) {
     weaken (my $self = $self);
     $self->{timer}->{global} = AE::timer $timeout, 0, sub {
       $self->cancel if $self;
@@ -32,7 +33,7 @@ sub _try ($$) {
       return unless $self;
       $self->_set_result ($n, 0);
       delete $self->{timer}->{timeout}->{$n};
-    } if $retry_timeout;
+    } if defined $retry_timeout and $retry_timeout >= 0;
     $self->{on_retry}->(sub {
       $self->_set_result ($n, @_) if $self;
     });
@@ -70,11 +71,11 @@ sub _get_next_interval ($) {
 } # get_next_interval
 
 sub timeout ($) {
-  return $_[0]->{timeout} || 60;
+  return defined $_[0]->{timeout} ? $_[0]->{timeout} : 60;
 } # timeout
 
 sub retry_timeout ($) {
-  return $_[0]->{retry_timeout} || 60;
+  return defined $_[0]->{retry_timeout} ? $_[0]->{retry_timeout} : 60;
 } # retry_timeout
 
 sub _get_next_retry_timeout ($) {

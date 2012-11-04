@@ -112,16 +112,17 @@ test {
       (on_retry => sub { },
        on_end => sub {
          test {
-           is $i++, 0;
-           undef $timer;
+           is $i++, 0, 'end';
            $cv->end;
+           undef $timer;
          } $c;
        },
-       timeout => 0);
+       timeout => undef);
   $cv->begin;
-  my $w; $w = AE::timer 100, 0, sub {
+  my $w; $w = AE::timer 62, 0, sub {
     test {
-      is $i++, 1;
+      is $i++, 1, 'timer';
+      ok !$timer;
       $cv->end;
       undef $w;
     } $c;
@@ -129,11 +130,47 @@ test {
   $cv->end;
   $cv->cb(sub {
     test {
+      is $i, 2;
       done $c;
       undef $c;
     } $c;
   });
-} n => 2, name => 'no global timeout';
+} n => 4, name => 'default global timeout';
+
+test {
+  my $c = shift;
+  my $cv = AE::cv;
+  my $i = 0;
+  $cv->begin;
+  $cv->begin;
+  my $timer; $timer = AnyEvent::Timer::Retry->new
+      (on_retry => sub { },
+       on_end => sub {
+         test {
+           is $i++, 1, 'end';
+           $cv->end;
+         } $c;
+       },
+       timeout => -1);
+  $cv->begin;
+  my $w; $w = AE::timer 100, 0, sub {
+    test {
+      is $i++, 0, 'timer';
+      ok $timer;
+      undef $timer;
+      $cv->end;
+      undef $w;
+    } $c;
+  };
+  $cv->end;
+  $cv->cb(sub {
+    test {
+      is $i, 2;
+      done $c;
+      undef $c;
+    } $c;
+  });
+} n => 4, name => 'no global timeout';
 
 test {
   my $c = shift;
@@ -337,6 +374,20 @@ test {
        retry_timeout => undef,
        timeout => 2);
 } n => 3, name => 'no local timeout';
+
+test {
+  my $c = shift;
+  my $timer; $timer = AnyEvent::Timer::Retry->new
+      (on_retry => sub { $_[0]->(1) },
+       on_end => sub {
+         test {
+           is $timer->retry_timeout, 60;
+           undef $timer;
+           done $c;
+           undef $c;
+         } $c;
+       });
+} n => 1, name => 'local timeout default';
 
 test {
   my $c = shift;
