@@ -7,10 +7,10 @@ AnyEvent::Timer::Retry - Retrying until some condition is satisfied
   use AnyEvent::Timer::Retry;
   my $timer; $timer = AnyEvent::Timer::Retry->new
       (on_retry => sub {
-         warn sprintf "%dth retry..." $_[0]->retry_count;
-         $_[0]->set_result ($ok, $appdata);
+         warn sprintf "%dth retry..." $timer->retry_count;
+         $_[0]->($ok, $appdata);
        },
-       on_done => sub {
+       on_end => sub {
          my ($self, $ok, $appdata) = @_;
          if ($ok) {
            warn sprintf "Succeeded after %d tries", $self->retry_count;
@@ -29,9 +29,9 @@ condition is satisfied.
 
 The module runs the specified code by instantiating it with the C<new>
 method.  The code specified by the C<on_retry> option to the method is
-repeatedly invoked until the C<set_result> method of the object is
-invoked with a true value, or the execution is cancelled.  Finally the
-code specified by the C<on_done> option is invoked.
+repeatedly invoked until the object is notified as succeeded, or the
+execution is cancelled.  Finally the code specified by the C<on_end>
+option is invoked.
 
 =over 4
 
@@ -46,39 +46,53 @@ name/value pairs, which include:
 
 The code reference that is invoked for each try.
 
-The code is invoked with an argument: The C<AnyEvent::Timer::Retry>
-object created by the C<new> method.  The code is expected not to
-throw any exception.
+The code is invoked with the code reference I<$done> as the argument.
+The code is expected to invoke I<$done> directly or indirectly,
+synchronously or asynchronouslym with the following arguments: The
+first argument must be the boolean value representing whether the
+retry has succeeded or not.  The second argment optionally accept any
+value, which can be used to pass application-dependent data from the
+C<on_retry> code to the C<on_end> code.  The I<$done> is expected to
+be invoked exactly once.  Second or later invocations are silently
+ignored.
 
-The code is expected to invoke the C<set_result> method of the
-C<AnyEvent::Timer::Retry> object, directly or indirectly,
-synchronously or asynchronously.
+The code is expected not to throw any exception.  The I<$done> code
+will not throw any exception.
 
 Note that this code is also invoked for the first try.  It is counted
 as the "zeroth" retry.
 
 This option must be specified.
 
-=item on_done => CODE
+=item on_end => CODE
 
 The code reference that is invoked after the result of the last retry
 is determined.
 
-The code is invoked with three arguments: The
-C<AnyEvent::Timer::Retry> object created by the C<new> method; The
-result of the last retry in boolean; The optional application data set
-by the C<set_result> method.  The code is expected not to throw any
-exception.
+The code is invoked with two arguments: The result of the last retry
+in boolean; The optional application data set by the C<$done> argument
+invoked by the C<on_retry> code.  The code is expected not to throw
+any exception.
 
-=item initial_interval => NUMBER
+=item interval => NUMBER
 
 The initial value for the interval between retries, in seconds.
 
 =item timeout => NUMBER
 
-The global timeout, in seconds.  After this period is elapsed after
+The global timeout, in seconds.  After this period has elapsed since
 the C<new> method is invoked, the ongoing retrying is marked as failed
 and the entire retrying process is cancelled.  Defaulted to 60.
+
+Timeout is not set if zero or C<undef> is specified.
+
+=item retry_timeout => NUMBER
+
+The initial value for the timeout of a retrying, in seconds.  Once
+this period has elapsed after the retrying is started, it waits for
+the next retrying with the appropriate interval.  Please note that the
+retrying operation itself cannot be stopped, but its result is simply
+discarded.  Defaulted to 60.
 
 Timeout is not set if zero or C<undef> is specified.
 
@@ -92,18 +106,6 @@ returns one (1).
 
 After the last retry, this method returns the number of the retries
 run with the object.
-
-=item $timer->set_result ($ok, $data)
-
-Set the result of the retry.  The first argument must be the boolean
-value representing whether the retry has succeeded or not.  The second
-argment optionally accept any value, which can be used to pass
-application-dependent data from the C<on_retry> code to the C<on_done>
-code.
-
-This method must be invoked exactly once by the C<on_retry> code,
-directly or indirectly, synchronously or asynchronously.  The method
-must not invoked in the other situations.
 
 =item undef $timer
 

@@ -20,15 +20,15 @@ test {
   my $i = 0;
   my $timer; $timer = AnyEvent::Timer::Retry->new
       (on_retry => sub {
-         my $timer = shift;
+         my $done = shift;
          test {
            $invoked->($timer->retry_count);
            is $timer->retry_count, $i++;
-           $timer->set_result($timer->retry_count == 10, "abc");
+           $done->($timer->retry_count == 10, "abc");
          } $c;
        },
-       on_done => sub {
-         my (undef, $r, $value) = @_;
+       on_end => sub {
+         my ($r, $value) = @_;
          test {
            is !!$r, $i == 11;
            is $value, "abc";
@@ -41,7 +41,7 @@ test {
            undef $c;
          } $c;
        },
-       initial_interval => 0.1);
+       interval => 0.1);
 } n => 11 + 5, name => 'basic';
 
 test {
@@ -51,7 +51,7 @@ test {
       (on_retry => sub {
          #
        },
-       on_done => sub {
+       on_end => sub {
          test {
            my $elapsed = time - $start_time;
            ok $elapsed < 2 + 1;
@@ -74,23 +74,23 @@ test {
   my $i = 0;
   my $timer; $timer = AnyEvent::Timer::Retry->new
       (on_retry => sub {
-         my $timer = $_[0];
+         my $done = $_[0];
          my $w; $w = AE::timer 3, 0, sub {
-           $timer->set_result (1);
+           $done->(1);
            undef $w;
            $i++;
            $cv->end;
          };
        },
-       on_done => sub {
-         my $ok = $_[1];
+       on_end => sub {
+         my $ok = $_[0];
          test {
            ok !$ok;
            $cv->end;
            undef $timer;
          } $c;
        },
-       initial_interval => 0.1,
+       interval => 0.1,
        timeout => 1);
   $cv->end;
   $cv->cb(sub {
@@ -110,7 +110,7 @@ test {
   $cv->begin;
   my $timer; $timer = AnyEvent::Timer::Retry->new
       (on_retry => sub { },
-       on_done => sub {
+       on_end => sub {
          test {
            is $i++, 0;
            undef $timer;
@@ -141,9 +141,9 @@ test {
   my $start_time = time;
   my $timer; $timer = AnyEvent::Timer::Retry->new
       (on_retry => sub {
-         $_[0]->set_result($_[0]->retry_count == 1);
+         $_[0]->($timer->retry_count == 1);
        },
-       on_done => sub {
+       on_end => sub {
          test {
            my $elapsed = time - $start_time;
            #note $elapsed;
@@ -166,14 +166,15 @@ test {
   my $done_invoked = 0;
   my $timer; $timer = AnyEvent::Timer::Retry->new
       (on_retry => sub {
+         my $done = $_[0];
          test {
            $retry_invoked++;
-           $timer->set_result (1);
-           $timer->set_result (0);
+           $done->(1);
+           $done->(0);
            $cv->end;
          } $c;
        },
-       on_done => sub {
+       on_end => sub {
          test {
            $done_invoked++;
            is $timer->retry_count, 0;
@@ -196,14 +197,16 @@ test {
   my $c = shift;
   my $retry_invoked = 0;
   my $done_invoked = 0;
+  my $code;
   my $timer; $timer = AnyEvent::Timer::Retry->new
       (on_retry => sub {
          $retry_invoked++;
-         $_[0]->set_result (1);
+         $code = $_[0];
+         $_[0]->(1);
        },
-       on_done => sub {
+       on_end => sub {
          $done_invoked++;
-         $_[0]->set_result (0);
+         $code->(0);
          test {
            is $retry_invoked, 1;
            is $done_invoked, 1;
@@ -223,21 +226,19 @@ test {
          if ($timer->retry_count == 1) {
            undef $timer;
          } else {
-           $timer->set_result (0);
+           $_[0]->(0);
          }
        },
-       on_done => sub {
-         my $t = shift;
+       on_end => sub {
          test {
            is $timer, undef;
-           is $t->retry_count, 1;
            is $i, 2;
            done $c;
            undef $c;
          } $c;
        },
-       initial_interval => 0.1);
-} n => 3, name => 'cancelled by undef $timer';
+       interval => 0.1);
+} n => 2, name => 'cancelled by undef $timer';
 
 test {
   my $c = shift;
@@ -249,10 +250,10 @@ test {
            $timer->cancel;
            $timer->cancel;
          } else {
-           $timer->set_result (0);
+           $_[0]->(0);
          }
        },
-       on_done => sub {
+       on_end => sub {
          test {
            is $timer->retry_count, 1;
            is $i, 2;
@@ -261,8 +262,113 @@ test {
            undef $timer;
          } $c;
        },
-       initial_interval => 0.1);
+       interval => 0.1);
 } n => 2, name => 'cancelled by $timer->cancel';
+
+test {
+  my $c = shift;
+  my $cv = AE::cv;
+  $cv->begin;
+  $cv->begin; # on_retry
+  $cv->begin; # on_end
+  my $i = 0;
+  my $j = 0;
+  my $timer; $timer = AnyEvent::Timer::Retry->new
+      (on_retry => sub {
+         my $done = shift;
+         test {
+           if ($timer->retry_count > 2) {
+             $done->(1, 3);
+             $cv->end; # on_retry
+           } else {
+             $i++;
+             $cv->begin;
+             my $w; $w = AE::timer 0.8, 0, sub {
+               test {
+                 $j++;
+                 $done->(1, 2);
+                 undef $w;
+                 $cv->end;
+               } $c;
+             };
+           }
+         } $c;
+       },
+       on_end => sub {
+         my ($result, $data) = @_;
+         test {
+           ok $result;
+           is $data, 3;
+           $cv->end;
+           undef $timer;
+         } $c;
+       },
+       interval => 0.1,
+       retry_timeout => 0.4);
+  $cv->end;
+  $cv->cb(sub {
+    test {
+      is $j, $i;
+      done $c;
+      undef $c;
+    } $c;
+  });
+} n => 3, name => 'local timeout';
+
+test {
+  my $c = shift;
+  my $start_time = time;
+  my $timer; $timer = AnyEvent::Timer::Retry->new
+      (on_retry => sub {
+         #
+       },
+       on_end => sub {
+         my $result = shift;
+         test {
+           ok !$result;
+           my $elapsed = time - $start_time;
+           ok $elapsed < 2 + 1;
+           ok $elapsed > 2 - 1;
+           done $c;
+           undef $c;
+           undef $timer;
+         } $c;
+       },
+       retry_timeout => undef,
+       timeout => 2);
+} n => 3, name => 'no local timeout';
+
+test {
+  my $c = shift;
+  my $invoked;
+  eval {
+    my $timer; $timer = AnyEvent::Timer::Retry->new
+        (on_end => sub { $invoked = 1; undef $timer });
+    ok !1;
+    1;
+  } or do {
+    ok $@ =~ /on_retry/;
+  };
+  ok !$invoked;
+  done $c;
+  undef $c;
+} n => 2, name => 'no on_retry';
+
+test {
+  my $c = shift;
+  my $invoked;
+  eval {
+    my $timer; $timer = AnyEvent::Timer::Retry->new
+        (on_retry => sub { $invoked = 1; undef $timer });
+    ok !1;
+    1;
+  } or do {
+    ok $@ =~ /on_end/;
+  };
+  ok !$invoked;
+  done $c;
+  undef $c;
+} n => 2, name => 'no on_end';
 
 run_tests;
 
