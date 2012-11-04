@@ -231,6 +231,15 @@ expected not to throw any exception.
 Latest version of the module is available from GitHub
 <https://github.com/wakaba/perl-anyevent-timer-retry>.
 
+Test results of the module can be examined at:
+<https://travis-ci.org/wakaba/perl-anyevent-timer-retry>.
+
+=head1 ACKNOWLEDGEMENTS
+
+Design and implementation of this module is influenced by previous
+works on this area, in particular L<AnyEvent::Retry> and
+L<AnyEvent::RetryTimer>.
+
 =head1 AUTHOR
 
 Wakaba <wakaba@suikawiki.org>.
