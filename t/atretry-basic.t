@@ -41,6 +41,7 @@ test {
            undef $c;
          } $c;
        },
+       interval_backoff => 'constant',
        interval => 0.1);
 } n => 11 + 5, name => 'basic';
 
@@ -420,6 +421,148 @@ test {
   done $c;
   undef $c;
 } n => 2, name => 'no on_end';
+
+test {
+  my $c = shift;
+  my $intervals = [];
+  my $timeouts = [];
+  my $timer; $timer = AnyEvent::Timer::Retry->new
+      (on_retry => sub {
+         push @$intervals, $timer->current_interval;
+         push @$timeouts, $timer->current_retry_timeout;
+         $_[0]->(@$intervals == 4);
+       },
+       on_end => sub {
+         test {
+           is_deeply $intervals, [0, 0.1, 0.1 * 1.5, 0.1 * 1.5 * 1.5];
+           is_deeply $timeouts, [60, 60, 60, 60];
+           done $c;
+           undef $c;
+           undef $timer;
+         } $c;
+       },
+       interval => 0.1);
+} n => 2, name => 'default interval';
+
+test {
+  my $c = shift;
+  my $intervals = [];
+  my $timeouts = [];
+  my $timer; $timer = AnyEvent::Timer::Retry->new
+      (on_retry => sub {
+         push @$intervals, $timer->current_interval;
+         push @$timeouts, $timer->current_retry_timeout;
+         $_[0]->(@$intervals == 4);
+       },
+       on_end => sub {
+         test {
+           is_deeply $intervals, [0, 0.1, 0.1, 0.1];
+           is_deeply $timeouts, [60, 60 * 2, 200, 200];
+           done $c;
+           undef $c;
+           undef $timer;
+         } $c;
+       },
+       interval => 0.1,
+       interval_backoff => 'constant',
+       retry_timeout_backoff => 'exponential',
+       retry_timeout_backoff_multiplier => 2,
+       retry_timeout_backoff_max => 200);
+} n => 2, name => 'constant interval, exponential timeout';
+
+test {
+  my $c = shift;
+  my $intervals = [];
+  my $timeouts = [];
+  my $timer; $timer = AnyEvent::Timer::Retry->new
+      (on_retry => sub {
+         push @$intervals, $timer->current_interval;
+         push @$timeouts, $timer->current_retry_timeout;
+         $_[0]->(@$intervals == 4);
+       },
+       on_end => sub {
+         test {
+           ok $intervals->[1] >= 0.1;
+           ok $intervals->[1] <= 0.5;
+           ok $intervals->[2] >= 0.1;
+           ok $intervals->[2] <= 0.5;
+           ok $intervals->[3] >= 0.1;
+           ok $intervals->[3] <= 0.5;
+           ok $timeouts->[0] >= 1;
+           ok $timeouts->[0] <= 5;
+           ok $timeouts->[2] >= 1;
+           ok $timeouts->[2] <= 5;
+           done $c;
+           undef $c;
+           undef $timer;
+         } $c;
+       },
+       interval => 0.1,
+       interval_backoff => 'random',
+       interval_backoff_min => 0.1,
+       interval_backoff_max => 0.5,
+       retry_timeout_backoff => 'random',
+       retry_timeout_backoff_min => 1,
+       retry_timeout_backoff_max => 5);
+} n => 10, name => 'random timeout';
+
+test {
+  my $c = shift;
+  my @msg;
+  my $timer; $timer = AnyEvent::Timer::Retry->new
+      (on_retry => sub {
+         $_[0]->($timer->retry_count == 1);
+       },
+       on_info => sub {
+         my %args = @_;
+         push @msg, $args{message};
+       },
+       on_end => sub {
+         test {
+           is scalar @msg, 1;
+           like $msg[0], qr{^Retry after };
+           done $c;
+           undef $c;
+           undef $timer;
+         } $c;
+       });
+} n => 2, name => 'on_info';
+
+test {
+  my $c = shift;
+  my $invoked;
+  eval {
+    my $timer; $timer = AnyEvent::Timer::Retry->new
+        (on_retry => sub { $invoked = 1; undef $timer },
+         on_end => sub { $invoked = 1; undef $timer },
+         interval_backoff => 'hoge');
+    ok !1;
+    1;
+  } or do {
+    ok $@ =~ /backoff/, 'exception thrown but bad $@';
+  };
+  ok !$invoked;
+  done $c;
+  undef $c;
+} n => 2, name => 'bad interval_backoff';
+
+test {
+  my $c = shift;
+  my $invoked;
+  eval {
+    my $timer; $timer = AnyEvent::Timer::Retry->new
+        (on_retry => sub { $invoked = 1; undef $timer },
+         on_end => sub { $invoked = 1; undef $timer },
+         retry_timeout_backoff => 'hoge');
+    ok !1;
+    1;
+  } or do {
+    ok $@ =~ /backoff/;
+  };
+  ok !$invoked;
+  done $c;
+  undef $c;
+} n => 2, name => 'bad retry_timeout_backoff';
 
 run_tests;
 

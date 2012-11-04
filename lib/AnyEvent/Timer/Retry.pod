@@ -74,9 +74,30 @@ in boolean; The optional application data set by the C<$done> argument
 invoked by the C<on_retry> code.  The code is expected not to throw
 any exception.
 
+This option must be specified.
+
+=item on_info => CODE
+
+The code reference that is invoked when advisory or debug information
+is available.  It is invoked when retry is scheduled, for example.
+
+If specified, the code reference is invoked with key/value pairs as
+arguments.  At the time of writing, the only available key is
+C<message>, which is always included in the argument.  The value
+contains the human readable short description of the situation.  The
+code reference is expected not to throw any exception.
+
+Unless the code reference is explicitly specified, the C<message>
+value is printed to the standard error output.
+
 =item interval => NUMBER
 
 The initial value for the interval between retries, in seconds.
+
+=item interval_backoff => STRING
+
+Specify the backoff algorithm used to determine the sequence of
+intervals for retries.  See later section for more information.
 
 =item timeout => NUMBER
 
@@ -96,7 +117,15 @@ discarded.  Defaulted to 60.
 
 Timeout is not set if the value is a negative number.
 
+=item retry_timeout_backoff => STRING
+
+Specify the algorithm to determine the sequence of timeout values for
+retries.  See later section for more information.
+
 =back
+
+In additon, parameters to backoff algorithms can be specified as well,
+as described in later section.
 
 =item $count = $timer->retry_count
 
@@ -106,6 +135,25 @@ returns one (1).
 
 After the last retry, this method returns the number of the retries
 run with the object.
+
+=item $interval = $timer->interval
+
+Return the I<initial> value for the interval between retries, in
+seconds.
+
+=item $interval = $timer->current_interval
+
+Return the interval before the current (or last) retry, in seconds.
+For the first try, it returns zero.
+
+=item $timeout = $timer->retry_timeout
+
+Return the I<initial> value for the retry timeout, in seconds.
+
+=item $timeout = $timer->current_retry_timeout
+
+Return the retry timeout value for the current (or last) retry, in
+seconds.
 
 =item undef $timer
 
@@ -120,6 +168,59 @@ After cancelled, the C<on_done> code is invoked with the result
 argument set to false, with no application data.
 
 =back
+
+=head1 BACKOFF ALGORITHMS
+
+The intervals between retries are determined by the algorithm
+specified to the C<interval_backoff> option.  Likewise, the way to
+determine the timeout values of retries are specified by the
+C<retry_timeout_backoff> option.  They are defaulted to C<exponential>
+and C<constant>, respectively.
+
+Following builtin backoff algorithm are defined:
+
+=over 4
+
+=item C<constant>
+
+The value is never changed from their initial values.
+
+=item C<exponential>
+
+The exponential backoff, i.e. the value is increased by multiplying
+previous value.  If the option C<interval_backoff_multiplier> or
+C<retry_timeout_backoff_multiplier> is specified, it is used as the
+multiplier for the values.  Defaulted to C<1.5>.  If the option
+C<interval_backoff_max> or C<retry_timeout_backoff_max> is specified,
+and if the calculated value is greater than that value, it is used as
+the value instead.
+
+=item C<random>
+
+The value is randomly selected between minimum and maximum values.
+The initial value is ignored.  The minimum value is taken from the
+option C<interval_backoff_min> or C<retry_timeout_backoff_min>.
+Likewise, the maximum value is taken from the option
+C<interval_backoff_max> or C<retry_timeout_backoff_max>.  Their
+defaults are C<1> and C<10>, respectively.
+
+=back
+
+In addition, you can define other backoff algorithm by adding
+key-value pair to hash reference
+C<$AnyEvent::Timer::Retry::BackoffAlgorithms>, where key is the short
+name of the backoff algorithm and the value is the implementation of
+the algorithm given as a code reference.  The code reference is
+invoked with two values: The first, I<$type>, represents the type of
+the value, C<interval> or C<retry_timeout>.  The second, I<$timer>, is
+the C<AnyEvent::Timer::Retry> object.  It can access to the initial
+value by C<< $timer->$type >>, the current value by C<<
+$timer->{"current_$type"} >> (which could be C<undef> for the first
+try), the current retry count by C<< $timer->retry_count >>, an
+algorithm-specific option by C<< $timer->{$type . '_backoff_' . $name}
+>> where I<$name> is the algorithm-specific option name.  Any other
+member of C<< $timer >> should not be accessed.  The code reference is
+expected not to throw any exception.
 
 =head1 AUTHOR
 
