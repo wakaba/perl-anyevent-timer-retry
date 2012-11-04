@@ -109,9 +109,9 @@ Timeout is not set if the value is a negative number.
 
 =item retry_timeout => NUMBER
 
-The initial value for the timeout of a retrying, in seconds.  Once
-this period has elapsed after the retrying is started, it waits for
-the next retrying with the appropriate interval.  Please note that the
+The initial value for the timeout of a retry, in seconds.  Once this
+period has elapsed after the retrying is started, it waits for the
+next retrying with the appropriate interval.  Please note that the
 retrying operation itself cannot be stopped, but its result is simply
 discarded.  Defaulted to 60.
 
@@ -121,6 +121,10 @@ Timeout is not set if the value is a negative number.
 
 Specify the algorithm to determine the sequence of timeout values for
 retries.  See later section for more information.
+
+=item max_retry_count => NUMBER
+
+The maximum number of retries.  By default, no maximum value is set.
 
 =back
 

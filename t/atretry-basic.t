@@ -564,6 +564,30 @@ test {
   undef $c;
 } n => 2, name => 'bad retry_timeout_backoff';
 
+test {
+  my $c = shift;
+  my $i = 0;
+  my $timer; $timer = AnyEvent::Timer::Retry->new
+      (on_retry => sub {
+         $i++;
+         $_[0]->(0, "aa");
+       },
+       on_end => sub {
+         my ($ok, $data) = @_;
+         test {
+           ok !$ok;
+           is $data, "aa";
+           is $i, 4;
+           is $timer->retry_count, 3;
+           undef $timer;
+           done $c;
+           undef $c;
+         } $c;
+       },
+       max_retry_count => 3,
+       interval => 0.1);
+} n => 4, name => 'max retry count';
+
 run_tests;
 
 =head1 LICENSE

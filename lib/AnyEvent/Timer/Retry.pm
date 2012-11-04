@@ -65,7 +65,8 @@ sub _try ($$) {
 sub _set_result ($$$$) {
   my ($self, $n, $result, $value) = @_;
   return if $self->{result_set}->{$n}++;
-  if ($result = !!$result or $self->{done}) {
+  if ($result = !!$result or $self->{done} or
+      (defined $self->{max_retry_count} and $self->{max_retry_count} <= $n)) {
     my $timer; $timer = AE::timer 0, 0, sub {
       $self->{on_end}->($result, $value);
       undef $timer;
