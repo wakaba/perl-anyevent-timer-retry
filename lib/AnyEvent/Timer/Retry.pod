@@ -157,6 +157,11 @@ Return the I<initial> value for the retry timeout, in seconds.
 Return the retry timeout value for the current (or last) retry, in
 seconds.
 
+=item $time = $timer->elapsed_time
+
+Return the elapsed time from the start of the timer, i.e. the
+invocation of the C<new> method, in seconds.
+
 =item undef $timer
 
 =item $timer->cancel

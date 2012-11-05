@@ -588,6 +588,37 @@ test {
        interval => 0.1);
 } n => 4, name => 'max retry count';
 
+test {
+  my $c = shift;
+  my $timer; $timer = AnyEvent::Timer::Retry->new
+      (on_retry => sub {
+         my $done = shift;
+         test {
+           if ($timer->retry_count == 0) {
+             my $time = $timer->elapsed_time;
+             ok $time >= 0;
+             ok $time <= 1 + 2;
+             $done->(0);
+           } elsif ($timer->retry_count == 1) {
+             my $time = $timer->elapsed_time;
+             ok $time >= 1 - 2;
+             ok $time <= 1 + 2;
+             $done->(1);
+           }
+         } $c;
+       },
+       on_end => sub {
+         test {
+           my $time = $timer->elapsed_time;
+           ok $time >= 1 - 2;
+           ok $time <= 1 + 2;
+           undef $timer;
+           done $c;
+           undef $c;
+         } $c;
+       });
+} n => 6, name => 'elapsed time';
+
 run_tests;
 
 =head1 LICENSE

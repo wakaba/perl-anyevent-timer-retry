@@ -4,6 +4,7 @@ use warnings;
 use Carp qw(croak);
 use AnyEvent;
 use Scalar::Util qw(weaken);
+use Time::HiRes qw(time);
 
 our $BackoffAlgorithms;
 
@@ -19,6 +20,7 @@ sub new ($%) {
       if $values->{retry_timeout_backoff} and
          not $BackoffAlgorithms->{$values->{retry_timeout_backoff}};
   my $self = bless $values, $class;
+  $self->{start_time} = time;
   my $timeout = $self->timeout;
   if (defined $timeout and $timeout >= 0) {
     weaken (my $self = $self);
@@ -122,6 +124,10 @@ sub _get_next_retry_timeout ($) {
   my $method = $self->retry_timeout_backoff;
   return $BackoffAlgorithms->{$method}->('retry_timeout', $self);
 } # _get_next_retry_timeout
+
+sub elapsed_time ($) {
+  return time - $_[0]->{start_time};
+} # elapsed_time
 
 sub cancel ($) {
   $_[0]->{done} = 1;
