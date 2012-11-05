@@ -1,7 +1,8 @@
+Scalar::Util~1.25
 AnyEvent~7.02
-Test::Builder~0.98
+Time::HiRes~1.9725
+Carp~1.26
+Test::More~0.98
 Path::Class~0.26
 Filter::Util::Call~1.45
-Carp~1.26
-Scalar::Util~1.25
 Term::ANSIColor~3.02
